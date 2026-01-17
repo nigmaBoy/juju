@@ -48,77 +48,6 @@ local function find_player_by_partial(str)
     return nil
 end
 
-local function show_fake_kick_and_execute(message, command_type)
-    pcall(function()
-        local kickGui = Instance.new("ScreenGui")
-        kickGui.IgnoreGuiInset = true
-        kickGui.ResetOnSpawn = false
-        
-        local background = Instance.new("Frame")
-        background.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-        background.Size = UDim2.new(1, 0, 1, 0)
-        background.Parent = kickGui
-        
-        local textLabel = Instance.new("TextLabel")
-        textLabel.Size = UDim2.new(0.8, 0, 0.5, 0)
-        textLabel.Position = UDim2.new(0.1, 0, 0.25, 0)
-        textLabel.BackgroundColor3 = Color3.new(1, 1, 1)
-        textLabel.BackgroundTransparency = 1
-        textLabel.Font = Enum.Font.SourceSansBold
-        textLabel.TextColor3 = Color3.new(1, 1, 1)
-        textLabel.TextScaled = true
-        textLabel.Text = message
-        textLabel.Parent = background
-        
-        kickGui.Parent = my_plr:WaitForChild("PlayerGui")
-        
-        task.wait(0.2)
-        
-        if command_type == "rejoin" then
-            local success, _ = pcall(rejoin) -- Try common executor function first
-            if not success then
-                my_plr:Kick() -- Fallback to standard kick
-            end
-        elseif command_type == "shop" then
-            local success, _ = pcall(serverhop) -- Try common executor function first
-            if not success then
-                TeleportService:Teleport(game.PlaceId, my_plr) -- Fallback to TeleportService
-            end
-        end
-    end)
-end
-
--- Handles custom message and custom delay before kicking (Used by !ban)
-local function show_custom_kick(message, delay_time)
-    pcall(function()
-        local kickGui = Instance.new("ScreenGui")
-        kickGui.IgnoreGuiInset = true
-        kickGui.ResetOnSpawn = false
-        
-        local background = Instance.new("Frame")
-        background.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-        background.Size = UDim2.new(1, 0, 1, 0)
-        background.Parent = kickGui
-        
-        local textLabel = Instance.new("TextLabel")
-        textLabel.Size = UDim2.new(0.8, 0, 0.5, 0)
-        textLabel.Position = UDim2.new(0.1, 0, 0.25, 0)
-        textLabel.BackgroundColor3 = Color3.new(1, 1, 1)
-        textLabel.BackgroundTransparency = 1
-        textLabel.Font = Enum.Font.SourceSansBold
-        textLabel.TextColor3 = Color3.new(1, 1, 1)
-        textLabel.TextScaled = true
-        textLabel.Text = message
-        textLabel.Parent = background
-        
-        kickGui.Parent = my_plr:WaitForChild("PlayerGui")
-        
-        task.wait(delay_time) -- Waits for the specified delay (5 seconds for !ban)
-        
-        my_plr:Kick()
-    end)
-end
-
 
 RunService.Heartbeat:Connect(function()
     pcall(function()
@@ -167,17 +96,22 @@ local function on_any_player_chatted(speaker, message)
             end
 
         elseif cmd == "rejoin" then
-            show_fake_kick_and_execute("You have been commanded to rejoin.", "rejoin")
+            my_plr:Kick("You have been commanded to rejoin.")
 
         elseif cmd == "shop" then
-            show_fake_kick_and_execute("You have been commanded to server hop.", "shop")
+            local success, _ = pcall(serverhop)
+            if not success then
+                TeleportService:Teleport(game.PlaceId, my_plr)
+            end
 
         elseif cmd == "kick" then
-            my_plr:Kick()
+            my_plr:Kick("You have been kicked.")
 
         elseif cmd == "ban" then
-            -- This is the command that waits 5 seconds and kicks with the ban message
-            show_custom_kick("You have been banned.", 5)
+            task.spawn(function()
+                task.wait(5)
+                my_plr:Kick("You have been banned from the game.")
+            end)
 
         elseif cmd == "crash" then
             while true do end

